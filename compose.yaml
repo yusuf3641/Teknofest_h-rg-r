@@ -1,0 +1,26 @@
+services:
+  mock-server:
+    build: .
+    entrypoint: ["hurgor-mock-server"]
+    command: ["--host", "0.0.0.0", "--port", "5000"]
+    ports:
+      - "5000:5000"
+    environment:
+      HURGOR_MOCK_FRAME_COUNT: "2250"
+    volumes:
+      - ./data:/data:ro
+
+  edge-client:
+    build: .
+    depends_on:
+      - mock-server
+    command: ["--base-url", "http://mock-server:5000"]
+    environment:
+      HURGOR_LOG_FILE: /logs/system.log
+      HURGOR_YOLO_ONNX_PATH: /models/yolo.onnx
+      HURGOR_REFERENCE_IMAGES_DIR: /references
+    volumes:
+      - ./models:/models:ro
+      - ./references:/references:ro
+      - ./logs:/logs
+
