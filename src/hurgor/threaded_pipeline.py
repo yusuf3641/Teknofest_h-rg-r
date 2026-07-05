@@ -263,6 +263,13 @@ class ThreadedEdgePipeline:
                 except PermanentAPIError as exc:
                     self._fatal(f"permanent Network IN error: {exc}")
                     return
+                configured_session = self._absolute_session_url()
+                if frame.session != configured_session:
+                    LOGGER.warning(
+                        "session_mismatch configured=%s received=%s",
+                        configured_session,
+                        frame.session,
+                    )
 
                 try:
                     image_bytes = gateway.fetch_image(frame.image_url)
@@ -432,6 +439,9 @@ class ThreadedEdgePipeline:
 
     def _absolute_user_url(self) -> str:
         return urljoin(f"{self.settings.base_url}/", self.settings.user_url)
+
+    def _absolute_session_url(self) -> str:
+        return urljoin(f"{self.settings.base_url}/", self.settings.session_url)
 
     def _wait_for_ack(self, expected_frame: str) -> bool:
         while not self.stop_event.is_set():

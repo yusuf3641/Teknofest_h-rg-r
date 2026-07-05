@@ -76,7 +76,17 @@ Kısa koşu:
 hurgor-client --max-frames 100
 ```
 
-Şartnamedeki örnek `health_status` ile metindeki `gps_health_status` alanlarının ikisi de kabul edilir. POST varsayılan olarak tek elemanlı JSON listesidir.
+Şartnamenin 25-27. sayfalarındaki sözleşmeye göre:
+
+- GET cevabı tek elemanlı JSON listesidir ve mock sunucu `health_status` üretir.
+- İstemci, dokümandaki metin/şekil farkı nedeniyle hem `health_status` hem
+  `gps_health_status` okuyabilir.
+- POST gövdesi her zaman tek elemanlı JSON listesidir.
+- `user`, `HURGOR_USER_URL` değerinden mutlak URL olarak POST'a eklenir.
+- `session`, `HURGOR_SESSION_URL` ile mock GET cevabında üretilir ve gelen oturumla
+  karşılaştırılır; resmî POST örneğinde `session` alanı bulunmadığı için POST'a eklenmez.
+- Nesne sınıfları `http://SERVER/classes/CLASS_ID/` biçiminde gönderilir.
+- Tahmin kimliği deterministik SHA-256 özetinden, JSON için güvenli tamsayı aralığında üretilir.
 
 ## Model runtime ve export
 

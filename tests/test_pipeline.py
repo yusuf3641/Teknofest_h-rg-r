@@ -39,8 +39,8 @@ async def test_repeated_get_returns_same_frame_until_post() -> None:
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://testserver"
     ) as client:
-        first = (await client.get("/api/frames/next")).json()
-        second = (await client.get("/api/frames/next")).json()
+        first = (await client.get("/api/frames/next")).json()[0]
+        second = (await client.get("/api/frames/next")).json()[0]
         assert first["url"] == second["url"]
         status = (await client.get("/api/status")).json()
         assert status["next_index"] == 0
@@ -53,12 +53,12 @@ async def test_mock_faults_are_deterministic_and_do_not_advance_frame() -> None:
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://testserver"
     ) as client:
-        first = (await client.get("/api/frames/next")).json()
+        first = (await client.get("/api/frames/next")).json()[0]
         response = await client.post("/api/predictions", json=_prediction(first["url"], 1))
         assert response.status_code == 200
 
-        assert (await client.get("/api/frames/next")).json() == {}
-        second = (await client.get("/api/frames/next")).json()
+        assert (await client.get("/api/frames/next")).json() == []
+        second = (await client.get("/api/frames/next")).json()[0]
         corrupt_image = await client.get(second["image_url"])
         assert corrupt_image.content == b"corrupt-jpeg"
         status = (await client.get("/api/status")).json()
@@ -74,7 +74,7 @@ async def test_mock_server_history_is_bounded() -> None:
         transport=httpx.ASGITransport(app=app), base_url="http://testserver"
     ) as client:
         for index in range(frame_count):
-            frame = (await client.get("/api/frames/next")).json()
+            frame = (await client.get("/api/frames/next")).json()[0]
             response = await client.post("/api/predictions", json=_prediction(frame["url"], index))
             assert response.status_code == 200
         status = (await client.get("/api/status")).json()

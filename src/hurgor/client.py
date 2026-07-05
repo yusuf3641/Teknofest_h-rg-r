@@ -57,9 +57,7 @@ class CompetitionAPI:
         return response.content
 
     async def submit(self, prediction: Prediction) -> None:
-        payload: Any = prediction.canonical_dict()
-        if self.settings.post_as_list:
-            payload = [payload]
+        payload: Any = [prediction.canonical_dict()]
         await self._request("POST", self.settings.prediction_endpoint, json=payload)
 
     async def _request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:

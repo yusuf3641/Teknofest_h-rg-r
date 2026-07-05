@@ -8,20 +8,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def _env_bool(name: str, default: bool) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "on"}
-
-
 @dataclass(frozen=True, slots=True)
 class ClientSettings:
     base_url: str = "http://127.0.0.1:5000"
     frame_endpoint: str = "/api/frames/next"
     prediction_endpoint: str = "/api/predictions"
     user_url: str = "/users/1/"
-    post_as_list: bool = True
+    session_url: str = "/session/1/"
     http_timeout_seconds: float = 2.0
     max_retries: int = 3
     retry_base_seconds: float = 0.1
@@ -52,7 +45,7 @@ class ClientSettings:
                 "HURGOR_PREDICTION_ENDPOINT", defaults.prediction_endpoint
             ),
             user_url=os.getenv("HURGOR_USER_URL", defaults.user_url),
-            post_as_list=_env_bool("HURGOR_POST_AS_LIST", defaults.post_as_list),
+            session_url=os.getenv("HURGOR_SESSION_URL", defaults.session_url),
             http_timeout_seconds=float(
                 os.getenv("HURGOR_HTTP_TIMEOUT_SECONDS", defaults.http_timeout_seconds)
             ),
@@ -136,6 +129,8 @@ class ClientSettings:
 class MockSettings:
     frame_count: int = 2250
     healthy_frames: int = 450
+    user_url: str = "/users/1/"
+    session_url: str = "/session/1/"
     corrupt_every: int = 0
     empty_every: int = 0
     get_delay_ms: int = 0
@@ -154,6 +149,8 @@ class MockSettings:
                 0,
                 int(os.getenv("HURGOR_MOCK_HEALTHY_FRAMES", defaults.healthy_frames)),
             ),
+            user_url=os.getenv("HURGOR_USER_URL", defaults.user_url),
+            session_url=os.getenv("HURGOR_SESSION_URL", defaults.session_url),
             corrupt_every=max(
                 0,
                 int(os.getenv("HURGOR_MOCK_CORRUPT_EVERY", defaults.corrupt_every)),

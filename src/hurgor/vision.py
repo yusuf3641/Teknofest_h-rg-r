@@ -139,14 +139,14 @@ class OptimizedObjectDetector:
     def _landing_status(
         self, detections: list[DetectedObject], image_size: tuple[int, int]
     ) -> list[DetectedObject]:
-        obstacles = [item for item in detections if item.cls in {"0", "1"}]
+        obstacles = [item for item in detections if item.class_id in {"0", "1"}]
         obstacle_frustums = [
-            self.projector.aabb(item, image_size, 1.7 if item.cls == "1" else 1.5)
+            self.projector.aabb(item, image_size, 1.7 if item.class_id == "1" else 1.5)
             for item in obstacles
         ]
         output: list[DetectedObject] = []
         for item in detections:
-            if item.cls not in {"2", "3"}:
+            if item.class_id not in {"2", "3"}:
                 output.append(item)
                 continue
             landing_frustum = self.projector.aabb(item, image_size, 0.30)
@@ -165,6 +165,7 @@ class ONNXYoloDetector:
         self,
         model_path: str,
         *,
+        base_url: str = "http://127.0.0.1:5000",
         confidence: float = 0.25,
         iou_threshold: float = 0.45,
         num_classes: int = 4,
@@ -215,6 +216,7 @@ class ONNXYoloDetector:
         self.confidence = confidence
         self.iou_threshold = iou_threshold
         self.num_classes = num_classes
+        self.base_url = base_url
         LOGGER.info("yolo_backend providers=%s model=%s", self.session.get_providers(), path)
 
     def detect(self, image: Image.Image, frame: FrameMetadata) -> list[DetectedObject]:
@@ -268,8 +270,9 @@ class ONNXYoloDetector:
             y2 = max(y1 + 1, min(float(original_height), top + height))
             class_id = classes[idx]
             detections.append(
-                DetectedObject(
-                    cls=str(class_id),
+                DetectedObject.from_class_id(
+                    class_id,
+                    base_url=self.base_url,
                     landing_status="-1",
                     motion_status="-1",
                     top_left_x=x1,
@@ -448,7 +451,10 @@ def build_vision_components(
         )
 
     if settings.yolo_onnx_path:
-        base_detector: ObjectDetector = ONNXYoloDetector(settings.yolo_onnx_path)
+        base_detector: ObjectDetector = ONNXYoloDetector(
+            settings.yolo_onnx_path,
+            base_url=settings.base_url,
+        )
         detector: ObjectDetector = OptimizedObjectDetector(
             base_detector,
             TopologicalNoiseFilter(),

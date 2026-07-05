@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import io
 import math
 from dataclasses import dataclass, field
@@ -14,6 +13,7 @@ from .models import (
     DetectedUndefinedObject,
     FrameMetadata,
     Prediction,
+    prediction_id_from_frame_url,
 )
 
 if TYPE_CHECKING:
@@ -114,8 +114,7 @@ class PipelineInferenceEngine:
 
     @staticmethod
     def prediction_id(frame_url: str) -> int:
-        digest = hashlib.sha256(frame_url.encode("utf-8")).digest()
-        return int.from_bytes(digest[:8], "big") & ((1 << 63) - 1)
+        return prediction_id_from_frame_url(frame_url)
 
     def _prediction(
         self,

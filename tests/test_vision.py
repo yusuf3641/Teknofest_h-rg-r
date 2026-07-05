@@ -73,15 +73,17 @@ def test_orb_homography_writes_undefined_object_box(tmp_path) -> None:
 
 def test_volumetric_overlap_marks_landing_area_blocked() -> None:
     detections = [
-        DetectedObject(
-            cls="2",
+        DetectedObject.from_class_id(
+            2,
+            base_url="http://test",
             top_left_x=80,
             top_left_y=80,
             bottom_right_x=200,
             bottom_right_y=200,
         ),
-        DetectedObject(
-            cls="1",
+        DetectedObject.from_class_id(
+            1,
+            base_url="http://test",
             top_left_x=100,
             top_left_y=100,
             bottom_right_x=160,

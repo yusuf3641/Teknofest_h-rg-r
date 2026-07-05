@@ -10,6 +10,7 @@ from collections import deque
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from typing import Annotated, Any, Protocol
+from urllib.parse import urljoin
 
 import uvicorn
 from fastapi import Body, FastAPI, HTTPException, Request, Response
@@ -46,7 +47,7 @@ class MockState:
             "url": f"{root}/frames/{index}/",
             "image_url": f"/media/frame_{index:06d}.jpg",
             "video_name": "hurgor_mock_v1",
-            "session": f"{root}/session/1/",
+            "session": urljoin(f"{root}/", self.settings.session_url),
             "translation_x": translation[0],
             "translation_y": translation[1],
             "translation_z": translation[2],
@@ -159,13 +160,13 @@ def create_app(settings: MockSettings | None = None) -> FastAPI:
                 )
                 if should_fault:
                     state.last_empty_fault_index = index
-                    return JSONResponse({})
+                    return JSONResponse([])
                 state.outstanding_index = index
 
             payload = state.metadata(request, index)
         if state.settings.get_delay_ms:
             await asyncio.sleep(state.settings.get_delay_ms / 1000)
-        return JSONResponse(payload)
+        return JSONResponse([payload])
 
     @app.get("/media/frame_{index}.jpg")
     async def get_frame_image(index: int) -> Response:
@@ -179,20 +180,39 @@ def create_app(settings: MockSettings | None = None) -> FastAPI:
         return Response(content=content, media_type="image/jpeg")
 
     @app.post("/api/predictions")
-    async def post_prediction(payload: Annotated[Any, Body()]) -> dict[str, Any]:
+    async def post_prediction(
+        request: Request,
+        payload: Annotated[Any, Body()],
+    ) -> dict[str, Any]:
         if state.settings.post_delay_ms:
             await asyncio.sleep(state.settings.post_delay_ms / 1000)
-        raw_prediction: Any
-        if isinstance(payload, list):
-            if len(payload) != 1:
-                raise HTTPException(status_code=422, detail="exactly one prediction is required")
-            raw_prediction = payload[0]
-        else:
-            raw_prediction = payload
+        if not isinstance(payload, list) or len(payload) != 1:
+            raise HTTPException(
+                status_code=422,
+                detail="official contract requires a one-item prediction list",
+            )
+        raw_prediction: Any = payload[0]
         try:
             prediction = Prediction.model_validate(raw_prediction)
         except ValidationError as exc:
             raise HTTPException(status_code=422, detail=exc.errors()) from exc
+        root = str(request.base_url).rstrip("/")
+        expected_user = urljoin(f"{root}/", state.settings.user_url)
+        if prediction.user != expected_user:
+            raise HTTPException(
+                status_code=422,
+                detail=f"expected user {expected_user}",
+            )
+        expected_class_prefix = f"{root}/classes/"
+        class_url_mismatch = any(
+            not item.cls.startswith(expected_class_prefix)
+            for item in prediction.detected_objects
+        )
+        if class_url_mismatch:
+            raise HTTPException(
+                status_code=422,
+                detail=f"class URLs must start with {expected_class_prefix}",
+            )
 
         digest = _prediction_digest(prediction)
         async with state.lock:
