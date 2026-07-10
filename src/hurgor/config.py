@@ -15,6 +15,12 @@ class ClientSettings:
     prediction_endpoint: str = "/api/predictions"
     user_url: str = "/users/1/"
     session_url: str = "/session/1/"
+    team_name: str | None = None
+    password: str | None = None
+    session_name: str | None = None
+    auth_scheme: str = "auto"
+    auth_token: str | None = None
+    token_endpoint: str | None = None
     http_timeout_seconds: float = 2.0
     max_retries: int = 3
     retry_base_seconds: float = 0.1
@@ -38,14 +44,32 @@ class ClientSettings:
     @classmethod
     def from_env(cls) -> ClientSettings:
         defaults = cls()
+        official_base_url = os.getenv("EVALUATION_SERVER_URL")
+        team_name = os.getenv("TEAM_NAME") or None
+        password = os.getenv("PASSWORD") or None
+        session_name = os.getenv("SESSION_NAME") or None
+        official_mode = bool(official_base_url or team_name or password or session_name)
         return cls(
-            base_url=os.getenv("HURGOR_BASE_URL", defaults.base_url).rstrip("/"),
-            frame_endpoint=os.getenv("HURGOR_FRAME_ENDPOINT", defaults.frame_endpoint),
+            base_url=os.getenv(
+                "HURGOR_BASE_URL",
+                official_base_url or defaults.base_url,
+            ).rstrip("/"),
+            frame_endpoint=os.getenv(
+                "HURGOR_FRAME_ENDPOINT",
+                "/" if official_mode else defaults.frame_endpoint,
+            ),
             prediction_endpoint=os.getenv(
-                "HURGOR_PREDICTION_ENDPOINT", defaults.prediction_endpoint
+                "HURGOR_PREDICTION_ENDPOINT",
+                "/" if official_mode else defaults.prediction_endpoint,
             ),
             user_url=os.getenv("HURGOR_USER_URL", defaults.user_url),
             session_url=os.getenv("HURGOR_SESSION_URL", defaults.session_url),
+            team_name=team_name,
+            password=password,
+            session_name=session_name,
+            auth_scheme=os.getenv("HURGOR_AUTH_SCHEME", defaults.auth_scheme).lower(),
+            auth_token=os.getenv("HURGOR_AUTH_TOKEN") or None,
+            token_endpoint=os.getenv("HURGOR_TOKEN_ENDPOINT") or None,
             http_timeout_seconds=float(
                 os.getenv("HURGOR_HTTP_TIMEOUT_SECONDS", defaults.http_timeout_seconds)
             ),
@@ -131,11 +155,14 @@ class MockSettings:
     healthy_frames: int = 450
     user_url: str = "/users/1/"
     session_url: str = "/session/1/"
+    video_name: str = "hurgor_mock_v1"
     corrupt_every: int = 0
     empty_every: int = 0
     get_delay_ms: int = 0
     post_delay_ms: int = 0
     video_path: str | None = None
+    translation_csv_path: str | None = None
+    frame_stride: int = 1
 
     @classmethod
     def from_env(cls) -> MockSettings:
@@ -151,6 +178,7 @@ class MockSettings:
             ),
             user_url=os.getenv("HURGOR_USER_URL", defaults.user_url),
             session_url=os.getenv("HURGOR_SESSION_URL", defaults.session_url),
+            video_name=os.getenv("HURGOR_MOCK_VIDEO_NAME", defaults.video_name),
             corrupt_every=max(
                 0,
                 int(os.getenv("HURGOR_MOCK_CORRUPT_EVERY", defaults.corrupt_every)),
@@ -168,4 +196,9 @@ class MockSettings:
                 int(os.getenv("HURGOR_MOCK_POST_DELAY_MS", defaults.post_delay_ms)),
             ),
             video_path=os.getenv("HURGOR_MOCK_VIDEO_PATH") or None,
+            translation_csv_path=os.getenv("HURGOR_MOCK_TRANSLATION_CSV_PATH") or None,
+            frame_stride=max(
+                1,
+                int(os.getenv("HURGOR_MOCK_FRAME_STRIDE", defaults.frame_stride)),
+            ),
         )

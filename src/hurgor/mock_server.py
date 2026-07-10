@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import csv
 import hashlib
 import io
 import json
@@ -38,15 +39,20 @@ class MockState:
     def metadata(self, request: Request, index: int) -> dict[str, Any]:
         root = str(request.base_url).rstrip("/")
         healthy = index < self.settings.healthy_frames
-        translation: tuple[float | str, float | str, float | str]
-        if healthy:
-            translation = (round(index * 0.02, 4), round(index * 0.01, 4), 10.0)
-        else:
+        translation = self.frame_source.translation(index)
+        if translation is None:
+            if healthy:
+                translation = (round(index * 0.02, 4), round(index * 0.01, 4), 10.0)
+            else:
+                translation = ("NaN", "NaN", "NaN")
+        elif not healthy:
+            # In unhealthy windows the competition may hide/poison GPS values.
+            # Keeping NaN here exercises the client's visual-odometry fallback path.
             translation = ("NaN", "NaN", "NaN")
         return {
             "url": f"{root}/frames/{index}/",
             "image_url": f"/media/frame_{index:06d}.jpg",
-            "video_name": "hurgor_mock_v1",
+            "video_name": self.settings.video_name,
             "session": urljoin(f"{root}/", self.settings.session_url),
             "translation_x": translation[0],
             "translation_y": translation[1],
@@ -65,6 +71,8 @@ class FrameSource(Protocol):
     frame_count: int
 
     def render(self, index: int) -> bytes: ...
+
+    def translation(self, index: int) -> tuple[float, float, float] | None: ...
 
     def close(self) -> None: ...
 
@@ -86,9 +94,67 @@ class SyntheticFrameSource:
     def close(self) -> None:
         return None
 
+    def translation(self, index: int) -> tuple[float, float, float] | None:
+        del index
+        return None
+
+
+@dataclass(frozen=True, slots=True)
+class TranslationRow:
+    translation_x: float
+    translation_y: float
+    translation_z: float
+    frame_number: str
+
+
+class TranslationTrack:
+    def __init__(self, csv_path: str, *, frame_stride: int = 1) -> None:
+        self.path = csv_path
+        self.frame_stride = max(1, frame_stride)
+        self.rows = self._load(csv_path)
+        if not self.rows:
+            raise ValueError(f"translation CSV boş: {csv_path}")
+
+    @staticmethod
+    def _load(csv_path: str) -> list[TranslationRow]:
+        rows: list[TranslationRow] = []
+        with open(csv_path, newline="", encoding="utf-8-sig") as handle:
+            reader = csv.DictReader(handle)
+            required = {"translation_x", "translation_y", "translation_z", "frame_numbers"}
+            missing = required.difference(reader.fieldnames or [])
+            if missing:
+                raise ValueError(f"translation CSV eksik kolonlar: {sorted(missing)}")
+            for row in reader:
+                rows.append(
+                    TranslationRow(
+                        translation_x=float(row["translation_x"]),
+                        translation_y=float(row["translation_y"]),
+                        translation_z=float(row["translation_z"]),
+                        frame_number=row["frame_numbers"],
+                    )
+                )
+        return rows
+
+    @property
+    def frame_count(self) -> int:
+        return (len(self.rows) + self.frame_stride - 1) // self.frame_stride
+
+    def source_index(self, index: int) -> int:
+        return min(index * self.frame_stride, len(self.rows) - 1)
+
+    def translation(self, index: int) -> tuple[float, float, float]:
+        row = self.rows[self.source_index(index)]
+        return (row.translation_x, row.translation_y, row.translation_z)
+
 
 class VideoFrameSource:
-    def __init__(self, video_path: str) -> None:
+    def __init__(
+        self,
+        video_path: str,
+        *,
+        frame_stride: int = 1,
+        translation_track: TranslationTrack | None = None,
+    ) -> None:
         try:
             import cv2
         except ImportError as exc:
@@ -97,22 +163,29 @@ class VideoFrameSource:
             ) from exc
         self.cv2 = cv2
         self.path = str(video_path)
+        self.frame_stride = max(1, frame_stride)
+        self.translation_track = translation_track
         self.capture = cv2.VideoCapture(self.path)
         if not self.capture.isOpened():
             raise ValueError(f"video açılamadı: {self.path}")
-        self.frame_count = int(self.capture.get(cv2.CAP_PROP_FRAME_COUNT))
-        if self.frame_count <= 0:
+        self.raw_frame_count = int(self.capture.get(cv2.CAP_PROP_FRAME_COUNT))
+        if self.raw_frame_count <= 0:
             raise ValueError(f"videoda frame bulunamadı: {self.path}")
+        self.frame_count = (self.raw_frame_count + self.frame_stride - 1) // self.frame_stride
+        if self.translation_track is not None:
+            self.frame_count = min(self.frame_count, self.translation_track.frame_count)
         self.next_index = 0
         self.lock = threading.Lock()
 
     def render(self, index: int) -> bytes:
+        source_index = min(index * self.frame_stride, self.raw_frame_count - 1)
         with self.lock:
-            if index != self.next_index:
-                self.capture.set(self.cv2.CAP_PROP_POS_FRAMES, index)
+            expected_source = self.next_index * self.frame_stride
+            if source_index != expected_source:
+                self.capture.set(self.cv2.CAP_PROP_POS_FRAMES, source_index)
             ok, frame = self.capture.read()
             if not ok:
-                raise ValueError(f"video frame okunamadı: {index}")
+                raise ValueError(f"video frame okunamadı: logical={index} source={source_index}")
             self.next_index = index + 1
             ok, encoded = self.cv2.imencode(".jpg", frame, [self.cv2.IMWRITE_JPEG_QUALITY, 88])
             if not ok:
@@ -123,12 +196,29 @@ class VideoFrameSource:
         with self.lock:
             self.capture.release()
 
+    def translation(self, index: int) -> tuple[float, float, float] | None:
+        if self.translation_track is None:
+            return None
+        return self.translation_track.translation(index)
+
 
 def create_app(settings: MockSettings | None = None) -> FastAPI:
     configured = settings or MockSettings.from_env()
     source: FrameSource
     if configured.video_path:
-        source = VideoFrameSource(configured.video_path)
+        translation_track = (
+            TranslationTrack(
+                configured.translation_csv_path,
+                frame_stride=configured.frame_stride,
+            )
+            if configured.translation_csv_path
+            else None
+        )
+        source = VideoFrameSource(
+            configured.video_path,
+            frame_stride=configured.frame_stride,
+            translation_track=translation_track,
+        )
         configured = replace(configured, frame_count=source.frame_count)
     else:
         source = SyntheticFrameSource(configured.frame_count)
@@ -261,11 +351,28 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=5000)
     parser.add_argument("--video", default=None, help="Mock için yerel video dosyası")
+    parser.add_argument("--translation-csv", default=None, help="Frame translation CSV dosyası")
+    parser.add_argument(
+        "--frame-stride",
+        type=int,
+        default=None,
+        help="30 FPS videodan 7.5 FPS için 4",
+    )
+    parser.add_argument("--video-name", default=None)
+    parser.add_argument("--healthy-frames", type=int, default=None)
     parser.add_argument("--log-level", default="info")
     args = parser.parse_args()
     settings = MockSettings.from_env()
     if args.video:
         settings = replace(settings, video_path=args.video)
+    if args.translation_csv:
+        settings = replace(settings, translation_csv_path=args.translation_csv)
+    if args.frame_stride is not None:
+        settings = replace(settings, frame_stride=max(1, args.frame_stride))
+    if args.video_name:
+        settings = replace(settings, video_name=args.video_name)
+    if args.healthy_frames is not None:
+        settings = replace(settings, healthy_frames=max(0, args.healthy_frames))
     uvicorn.run(
         create_app(settings),
         host=args.host,

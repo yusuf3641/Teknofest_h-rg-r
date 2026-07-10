@@ -1,6 +1,7 @@
 .venv/
 __pycache__/
 *.py[cod]
+.DS_Store
 .pytest_cache/
 .ruff_cache/
 .coverage
@@ -9,3 +10,16 @@ htmlcov/
 system.log*
 .trt_cache/
 logs/
+
+# Yerel yarışma verileri ve büyük medya/arşiv dosyaları repoya eklenmemeli.
+veri/
+Rapor/
+*.mp4
+*.MP4
+*.mov
+*.MOV
+*.avi
+*.mkv
+*.rar
+*.zip
+*.7z

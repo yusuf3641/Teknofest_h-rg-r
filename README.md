@@ -44,6 +44,18 @@ Yerel videoyu sırayla frame'lere bölerek:
 hurgor-mock-server --video /absolute/path/test.mp4 --port 5000
 ```
 
+2026 örnek verisini yarışma hızına daha yakın 7.5 FPS mantığıyla çalıştırmak için
+30 FPS videoda `--frame-stride 4` kullanılabilir:
+
+```bash
+hurgor-mock-server \
+  --video /Users/yusufkaya/Desktop/HürGör/veri/THYZ_2026_Ornek_Veri_Seti/THYZ_2026_Ornek_Veri_1.MP4 \
+  --translation-csv /Users/yusufkaya/Desktop/HürGör/veri/THYZ_2026_Ornek_Veri_Seti/THYZ_2026_Ornek_Veri_1_translation.csv \
+  --frame-stride 4 \
+  --healthy-frames 450 \
+  --port 5000
+```
+
 Durum ve API dokümanı:
 
 - `http://127.0.0.1:5000/api/status`
@@ -74,6 +86,35 @@ Kısa koşu:
 
 ```bash
 hurgor-client --max-frames 100
+```
+
+Resmî bağlantı arayüzü için `.env` dosyasına komitenin verdiği değerleri yazın:
+
+```dotenv
+TEAM_NAME=...
+PASSWORD=...
+EVALUATION_SERVER_URL=http://havaciliktayapayzeka.teknofest.org:1025/
+SESSION_NAME=ONLINE_YARISMA_2026
+HURGOR_AUTH_SCHEME=auto
+HURGOR_AUTH_TOKEN=
+```
+
+Şifreyi repoya eklemeyin. Bağlantıyı POST atmadan kontrol etmek için:
+
+```bash
+hurgor-official-probe
+```
+
+10 Temmuz 2026 bağlantı kontrolünde resmî sunucu `WWW-Authenticate: Token`
+döndürmüştür. Bu durumda `TEAM_NAME/PASSWORD` doğrudan GET/POST için yeterli
+olmayabilir; komitenin Takım Bağlantı Arayüzü token üretiyorsa token değeri
+`.env` içinde `HURGOR_AUTH_TOKEN=...` olarak girilir. Token endpoint'i ayrıca
+duyurulursa `HURGOR_TOKEN_ENDPOINT` ile izlenir.
+
+Komite endpoint formatı kök URL üzerinden çalışıyorsa ve prob başarılıysa kısa koşu:
+
+```bash
+hurgor-client --max-frames 1
 ```
 
 Şartnamenin 25-27. sayfalarındaki sözleşmeye göre:

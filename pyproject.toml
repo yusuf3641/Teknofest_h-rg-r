@@ -43,6 +43,7 @@ select = ["E", "F", "I", "B", "UP"]
 hurgor-client = "hurgor.client:main"
 hurgor-export-yolo = "hurgor.export_models:main"
 hurgor-mock-server = "hurgor.mock_server:main"
+hurgor-official-probe = "hurgor.official_probe:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hurgor"]

@@ -12,7 +12,13 @@ from urllib.parse import urljoin
 
 import httpx
 
-from .client import CompetitionAPI, PermanentAPIError, RetryExhausted, SessionComplete
+from .client import (
+    CompetitionAPI,
+    PermanentAPIError,
+    RetryExhausted,
+    SessionComplete,
+    build_http_auth,
+)
 from .config import ClientSettings
 from .inference import PipelineInferenceEngine
 from .models import DetectedTranslation, FrameMetadata, Prediction
@@ -110,6 +116,7 @@ class AsyncioHTTPGateway:
     async def _create_client(self) -> httpx.AsyncClient:
         return httpx.AsyncClient(
             base_url=self.settings.base_url,
+            auth=build_http_auth(self.settings),
             timeout=httpx.Timeout(self.settings.http_timeout_seconds),
             limits=httpx.Limits(max_connections=2, max_keepalive_connections=2),
         )
