@@ -12,7 +12,12 @@ from hurgor.mock_server import TranslationTrack
 def test_official_env_uses_evaluation_server_defaults(monkeypatch) -> None:
     monkeypatch.delenv("HURGOR_BASE_URL", raising=False)
     monkeypatch.delenv("HURGOR_FRAME_ENDPOINT", raising=False)
+    monkeypatch.delenv("HURGOR_TRANSLATION_ENDPOINT", raising=False)
     monkeypatch.delenv("HURGOR_PREDICTION_ENDPOINT", raising=False)
+    monkeypatch.delenv("HURGOR_PROGRESS_ENDPOINT", raising=False)
+    monkeypatch.delenv("HURGOR_REFERENCE_ENDPOINT", raising=False)
+    monkeypatch.delenv("HURGOR_TOKEN_ENDPOINT", raising=False)
+    monkeypatch.delenv("HURGOR_API_CONTRACT", raising=False)
     monkeypatch.setenv("TEAM_NAME", "team")
     monkeypatch.setenv("PASSWORD", "secret")
     monkeypatch.setenv("EVALUATION_SERVER_URL", "http://official.example:1025/")
@@ -21,8 +26,13 @@ def test_official_env_uses_evaluation_server_defaults(monkeypatch) -> None:
     settings = ClientSettings.from_env()
 
     assert settings.base_url == "http://official.example:1025"
-    assert settings.frame_endpoint == "/"
-    assert settings.prediction_endpoint == "/"
+    assert settings.frame_endpoint == "/frames/"
+    assert settings.translation_endpoint == "/translation/"
+    assert settings.prediction_endpoint == "/prediction/"
+    assert settings.progress_endpoint == "/progress/"
+    assert settings.reference_endpoint == "/reference/"
+    assert settings.token_endpoint == "/auth/"
+    assert settings.api_contract == "official"
     assert settings.team_name == "team"
     assert settings.password == "secret"
     assert settings.session_name == "ONLINE_YARISMA_2026"
@@ -74,8 +84,12 @@ def test_cli_base_url_override_restores_local_endpoints_without_env_overrides(mo
     monkeypatch.delenv("HURGOR_PREDICTION_ENDPOINT", raising=False)
     official_settings = ClientSettings(
         base_url="http://official.example:1025",
-        frame_endpoint="/",
-        prediction_endpoint="/",
+        frame_endpoint="/frames/",
+        translation_endpoint="/translation/",
+        prediction_endpoint="/prediction/",
+        progress_endpoint="/progress/",
+        reference_endpoint="/reference/",
+        api_contract="official",
         team_name="team",
         password="secret",
     )
@@ -84,7 +98,14 @@ def test_cli_base_url_override_restores_local_endpoints_without_env_overrides(mo
 
     assert settings.base_url == "http://127.0.0.1:5126"
     assert settings.frame_endpoint == "/api/frames/next"
+    assert settings.translation_endpoint is None
     assert settings.prediction_endpoint == "/api/predictions"
+    assert settings.progress_endpoint == "/api/status"
+    assert settings.reference_endpoint is None
+    assert settings.api_contract == "local"
+    assert settings.auth_scheme == "none"
+    assert settings.auth_token is None
+    assert settings.token_endpoint is None
 
 
 def test_cli_base_url_override_keeps_explicit_endpoint_env(monkeypatch) -> None:

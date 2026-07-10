@@ -17,7 +17,7 @@ from .client import (
     PermanentAPIError,
     RetryExhausted,
     SessionComplete,
-    build_http_auth,
+    build_http_auth_async,
 )
 from .config import ClientSettings
 from .inference import PipelineInferenceEngine
@@ -116,7 +116,7 @@ class AsyncioHTTPGateway:
     async def _create_client(self) -> httpx.AsyncClient:
         return httpx.AsyncClient(
             base_url=self.settings.base_url,
-            auth=build_http_auth(self.settings),
+            auth=await build_http_auth_async(self.settings),
             timeout=httpx.Timeout(self.settings.http_timeout_seconds),
             limits=httpx.Limits(max_connections=2, max_keepalive_connections=2),
         )
@@ -271,7 +271,7 @@ class ThreadedEdgePipeline:
                     self._fatal(f"permanent Network IN error: {exc}")
                     return
                 configured_session = self._absolute_session_url()
-                if frame.session != configured_session:
+                if self.settings.api_contract != "official" and frame.session != configured_session:
                     LOGGER.warning(
                         "session_mismatch configured=%s received=%s",
                         configured_session,

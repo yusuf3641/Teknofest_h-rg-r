@@ -12,7 +12,10 @@ load_dotenv()
 class ClientSettings:
     base_url: str = "http://127.0.0.1:5000"
     frame_endpoint: str = "/api/frames/next"
+    translation_endpoint: str | None = None
     prediction_endpoint: str = "/api/predictions"
+    progress_endpoint: str = "/api/status"
+    reference_endpoint: str | None = None
     user_url: str = "/users/1/"
     session_url: str = "/session/1/"
     team_name: str | None = None
@@ -21,6 +24,7 @@ class ClientSettings:
     auth_scheme: str = "auto"
     auth_token: str | None = None
     token_endpoint: str | None = None
+    api_contract: str = "local"
     http_timeout_seconds: float = 2.0
     max_retries: int = 3
     retry_base_seconds: float = 0.1
@@ -56,12 +60,26 @@ class ClientSettings:
             ).rstrip("/"),
             frame_endpoint=os.getenv(
                 "HURGOR_FRAME_ENDPOINT",
-                "/" if official_mode else defaults.frame_endpoint,
+                "/frames/" if official_mode else defaults.frame_endpoint,
             ),
+            translation_endpoint=os.getenv(
+                "HURGOR_TRANSLATION_ENDPOINT",
+                "/translation/" if official_mode else defaults.translation_endpoint or "",
+            )
+            or None,
             prediction_endpoint=os.getenv(
                 "HURGOR_PREDICTION_ENDPOINT",
-                "/" if official_mode else defaults.prediction_endpoint,
+                "/prediction/" if official_mode else defaults.prediction_endpoint,
             ),
+            progress_endpoint=os.getenv(
+                "HURGOR_PROGRESS_ENDPOINT",
+                "/progress/" if official_mode else defaults.progress_endpoint,
+            ),
+            reference_endpoint=os.getenv(
+                "HURGOR_REFERENCE_ENDPOINT",
+                "/reference/" if official_mode else defaults.reference_endpoint or "",
+            )
+            or None,
             user_url=os.getenv("HURGOR_USER_URL", defaults.user_url),
             session_url=os.getenv("HURGOR_SESSION_URL", defaults.session_url),
             team_name=team_name,
@@ -69,7 +87,15 @@ class ClientSettings:
             session_name=session_name,
             auth_scheme=os.getenv("HURGOR_AUTH_SCHEME", defaults.auth_scheme).lower(),
             auth_token=os.getenv("HURGOR_AUTH_TOKEN") or None,
-            token_endpoint=os.getenv("HURGOR_TOKEN_ENDPOINT") or None,
+            token_endpoint=os.getenv(
+                "HURGOR_TOKEN_ENDPOINT",
+                "/auth/" if official_mode else "",
+            )
+            or None,
+            api_contract=os.getenv(
+                "HURGOR_API_CONTRACT",
+                "official" if official_mode else defaults.api_contract,
+            ).lower(),
             http_timeout_seconds=float(
                 os.getenv("HURGOR_HTTP_TIMEOUT_SECONDS", defaults.http_timeout_seconds)
             ),

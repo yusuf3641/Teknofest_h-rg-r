@@ -104,3 +104,55 @@ async def test_competition_api_rejects_empty_metadata() -> None:
         api = CompetitionAPI(_client_settings(), client)
         with pytest.raises(RetryExhausted):
             await api.fetch_frame()
+
+
+@pytest.mark.asyncio
+async def test_official_frame_fetch_merges_translation_without_overwriting_frame_url() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/frames/":
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "url": "http://official.test/frames/4/",
+                        "image_url": "/session/frame_000000.webp",
+                        "video_name": "official-session",
+                        "session": "http://official.test/session/1/",
+                    }
+                ],
+            )
+        if request.url.path == "/translation/":
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "url": "http://official.test/translation/2/",
+                        "frame": "http://official.test/frames/4/",
+                        "image_url": "/session/frame_000000.webp",
+                        "video_name": "official-session",
+                        "session": "http://official.test/session/1/",
+                        "translation_x": "0.044",
+                        "translation_y": "0.003",
+                        "translation_z": "-0.001",
+                        "health_status": "1",
+                    }
+                ],
+            )
+        return httpx.Response(404)
+
+    settings = ClientSettings(
+        base_url="http://official.test",
+        frame_endpoint="/frames/",
+        translation_endpoint="/translation/",
+        api_contract="official",
+    )
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        base_url="http://official.test",
+    ) as client:
+        frame = await CompetitionAPI(settings, client).fetch_frame()
+
+    assert frame.url == "http://official.test/frames/4/"
+    assert frame.image_url == "/session/frame_000000.webp"
+    assert frame.gps_health_status == 1
+    assert frame.reference_translation == (0.044, 0.003, -0.001)

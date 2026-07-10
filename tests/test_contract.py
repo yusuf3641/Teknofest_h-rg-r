@@ -183,3 +183,67 @@ def test_class_url_is_derived_from_server_base_url() -> None:
             bottom_right_x=2,
             bottom_right_y=2,
         )
+
+
+def test_official_payload_matches_connection_interface_shape() -> None:
+    prediction = Prediction(
+        id=22246,
+        user="http://official.test/users/4/",
+        frame="http://official.test/frames/4/",
+        detected_objects=[
+            DetectedObject.from_class_id(
+                0,
+                base_url="http://official.test",
+                landing_status="-1",
+                motion_status="1",
+                top_left_x=10,
+                top_left_y=20,
+                bottom_right_x=30,
+                bottom_right_y=40,
+            )
+        ],
+        detected_translations=[
+            DetectedTranslation(
+                translation_x=0.02,
+                translation_y=0.01,
+                translation_z=0.03,
+            )
+        ],
+        detected_undefined_objects=[
+            DetectedUndefinedObject(
+                object_id=1,
+                top_left_x=1,
+                top_left_y=2,
+                bottom_right_x=3,
+                bottom_right_y=4,
+            )
+        ],
+    )
+
+    payload = prediction.official_dict("http://official.test:1025")
+
+    assert payload == {
+        "frame": "http://official.test/frames/4/",
+        "detected_objects": [
+            {
+                "cls": "http://official.test:1025/classes/1/",
+                "landing_status": "-1",
+                "moving_status": "1",
+                "top_left_x": "10.0",
+                "top_left_y": "20.0",
+                "bottom_right_x": "30.0",
+                "bottom_right_y": "40.0",
+            }
+        ],
+        "detected_translations": [
+            {
+                "translation_x": "0.02",
+                "translation_y": "0.01",
+                "translation_z": "0.03",
+            }
+        ],
+        "reference_predictions": [],
+    }
+    assert "id" not in payload
+    assert "user" not in payload
+    assert "detected_undefined_objects" not in payload

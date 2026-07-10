@@ -97,6 +97,7 @@ EVALUATION_SERVER_URL=http://havaciliktayapayzeka.teknofest.org:1025/
 SESSION_NAME=ONLINE_YARISMA_2026
 HURGOR_AUTH_SCHEME=auto
 HURGOR_AUTH_TOKEN=
+HURGOR_TOKEN_ENDPOINT=/auth/
 ```
 
 Şifreyi repoya eklemeyin. Bağlantıyı POST atmadan kontrol etmek için:
@@ -105,19 +106,18 @@ HURGOR_AUTH_TOKEN=
 hurgor-official-probe
 ```
 
-10 Temmuz 2026 bağlantı kontrolünde resmî sunucu `WWW-Authenticate: Token`
-döndürmüştür. Bu durumda `TEAM_NAME/PASSWORD` doğrudan GET/POST için yeterli
-olmayabilir; komitenin Takım Bağlantı Arayüzü token üretiyorsa token değeri
-`.env` içinde `HURGOR_AUTH_TOKEN=...` olarak girilir. Token endpoint'i ayrıca
-duyurulursa `HURGOR_TOKEN_ENDPOINT` ile izlenir.
+10 Temmuz 2026 bağlantı kontrolünde resmî Takım Bağlantı Arayüzü incelendi.
+Token elle bulunmaz; istemci `TEAM_NAME/PASSWORD` ile otomatik olarak
+`POST /auth/` çağırır, dönen token'ı bellekte tutar ve sonraki istekleri
+`Authorization: Token ...` başlığıyla yapar. Token loglanmaz ve Git'e yazılmaz.
 
-Komite endpoint formatı kök URL üzerinden çalışıyorsa ve prob başarılıysa kısa koşu:
+Prob başarılıysa tek frame canlı test:
 
 ```bash
 hurgor-client --max-frames 1
 ```
 
-Şartnamenin 25-27. sayfalarındaki sözleşmeye göre:
+Yerel mock sözleşmesine göre:
 
 - GET cevabı tek elemanlı JSON listesidir ve mock sunucu `health_status` üretir.
 - İstemci, dokümandaki metin/şekil farkı nedeniyle hem `health_status` hem
@@ -128,6 +128,18 @@ hurgor-client --max-frames 1
   karşılaştırılır; resmî POST örneğinde `session` alanı bulunmadığı için POST'a eklenmez.
 - Nesne sınıfları `http://SERVER/classes/CLASS_ID/` biçiminde gönderilir.
 - Tahmin kimliği deterministik SHA-256 özetinden, JSON için güvenli tamsayı aralığında üretilir.
+
+Resmî 2026 Takım Bağlantı Arayüzü sözleşmesine göre:
+
+- Login: `POST /auth/`
+- İlerleme: `GET /progress/`
+- Frame: `GET /frames/`
+- Translation: `GET /translation/`
+- Tahmin: `POST /prediction/`
+- Referanslar: `GET /reference/`
+- Frame görseli: `/media` önekiyle indirilir.
+- POST gövdesi tek dict'tir; `id` ve `user` gönderilmez.
+- Nesne sınıf URL'leri resmî arayüzde `classes/1..4` şeklindedir.
 
 ## Model runtime ve export
 

@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from .client import CompetitionAPI, build_http_auth
+from .client import CompetitionAPI, build_http_auth_async
 from .config import ClientSettings
 from .logging_utils import configure_logging
 
@@ -81,14 +81,20 @@ async def probe(settings: ClientSettings, *, fetch_frame: bool = False) -> int:
             )
         return 2
 
+    try:
+        auth = await build_http_auth_async(settings)
+    except Exception as exc:  # noqa: BLE001 - diagnostic command must not crash.
+        LOGGER.error("auth_setup_failed error=%s", exc)
+        return 4
+
     async with httpx.AsyncClient(
         base_url=settings.base_url,
-        auth=build_http_auth(settings),
+        auth=auth,
         timeout=httpx.Timeout(settings.http_timeout_seconds),
     ) as client:
         saw_401 = False
         auth_headers: list[str] = []
-        for path in ("/docs/", "/"):
+        for path in (settings.progress_endpoint, settings.frame_endpoint):
             result = await _get(client, path)
             LOGGER.info(
                 "probe_get path=%s status=%s www_authenticate=%s allow=%s body=%s",

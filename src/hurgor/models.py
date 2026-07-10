@@ -10,8 +10,9 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 Status = Literal["-1", "0", "1"]
 CLASS_IDS = frozenset({"0", "1", "2", "3"})
+API_CLASS_IDS = frozenset({"0", "1", "2", "3", "4"})
 MAX_SAFE_JSON_INTEGER = (1 << 53) - 1
-_CLASS_PATH_PATTERN = re.compile(r"^/classes/(?P<class_id>[0-3])/$")
+_CLASS_PATH_PATTERN = re.compile(r"^/classes/(?P<class_id>[0-4])/$")
 
 
 def prediction_id_from_frame_url(frame_url: str) -> int:
@@ -43,6 +44,15 @@ class FrameMetadata(BaseModel):
     gps_health_status: Literal[0, 1] = Field(
         validation_alias=AliasChoices("gps_health_status", "health_status")
     )
+
+    @field_validator("gps_health_status", mode="before")
+    @classmethod
+    def normalize_health_status(cls, value: Any) -> int:
+        if value in {"0", 0} or value is False:
+            return 0
+        if value in {"1", 1} or value is True:
+            return 1
+        raise ValueError("gps_health_status/health_status must be 0 or 1")
 
     @property
     def reference_translation(self) -> tuple[float, float, float] | None:
@@ -131,3 +141,46 @@ class Prediction(BaseModel):
 
     def canonical_dict(self) -> dict[str, Any]:
         return self.model_dump(mode="json")
+
+    def official_dict(self, base_url: str) -> dict[str, Any]:
+        return {
+            "frame": self.frame,
+            "detected_objects": [
+                {
+                    "cls": _official_class_url(item.cls, base_url),
+                    "landing_status": item.landing_status,
+                    "moving_status": item.motion_status,
+                    "top_left_x": str(item.top_left_x),
+                    "top_left_y": str(item.top_left_y),
+                    "bottom_right_x": str(item.bottom_right_x),
+                    "bottom_right_y": str(item.bottom_right_y),
+                }
+                for item in self.detected_objects
+            ],
+            "detected_translations": [
+                {
+                    "translation_x": str(item.translation_x),
+                    "translation_y": str(item.translation_y),
+                    "translation_z": str(item.translation_z),
+                }
+                for item in self.detected_translations
+            ],
+            "reference_predictions": [],
+        }
+
+
+def _official_class_url(cls_url: str, base_url: str) -> str:
+    match = _CLASS_PATH_PATTERN.fullmatch(urlsplit(cls_url).path)
+    if match is None:
+        raise ValueError(f"invalid class URL: {cls_url}")
+    internal_id = int(match.group("class_id"))
+    # Internal pipeline IDs follow the documented constants 0..3. The official
+    # 2026 connection interface submits API URLs as classes/1..4.
+    api_id = internal_id + 1 if str(internal_id) in CLASS_IDS else internal_id
+    normalized_id = str(api_id)
+    if normalized_id not in API_CLASS_IDS:
+        raise ValueError(f"official class id must be one of {sorted(API_CLASS_IDS)}")
+    parsed = urlsplit(base_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("base_url must be an absolute HTTP(S) URL")
+    return f"{parsed.scheme}://{parsed.netloc}/classes/{normalized_id}/"
