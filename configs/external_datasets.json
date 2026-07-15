@@ -1,0 +1,97 @@
+{
+  "target_classes": ["arac", "insan", "uap", "uai"],
+  "sources": [
+    {
+      "name": "roboflow_hurgor_yapayzeka_gorev1_local",
+      "kind": "roboflow",
+      "workspace": "hamzas-workspace-cn5hg",
+      "project": "hurgor-yapayzeka-gorev1",
+      "version": "dataset",
+      "format": "yolov8",
+      "destination": "Hurgor-YapayZeka-Gorev1",
+      "url": "https://universe.roboflow.com/hamzas-workspace-cn5hg/hurgor-yapayzeka-gorev1",
+      "license": "CC BY 4.0",
+      "modality": "rgb",
+      "class_policy": {
+        "buldozer": "arac",
+        "car": "arac",
+        "person": "insan",
+        "uai": "uai",
+        "uap": "uap",
+        "goal": "ignore"
+      },
+      "notes": "Local Roboflow export added 2026-07-12. Merges buldozer/car into arac, drops goal/kale direği, and converts polygon labels to bounding boxes during normalization."
+    },
+    {
+      "name": "eflatun_teknofest_2022",
+      "kind": "git",
+      "url": "https://github.com/sezer-muhammed/Teknofest-Ulasimda-Yapay-Zeka-Veri-Seti.git",
+      "destination": "veri/external/eflatun_teknofest_2022",
+      "license": "unspecified-github-readme-citation",
+      "modality": "rgb",
+      "notes": "Landing repository for the TEKNOFEST 2022 AI in Transportation winners dataset. README links to a 46 GB Google Drive dataset.zip, so the actual YOLO archive requires a larger disk before download."
+    },
+    {
+      "name": "eflatun_teknofest_2022_drive_archive",
+      "kind": "google_drive_file",
+      "file_id": "1NdMg_4DKWNWg6_lzqMm6tzfqBjaK8Hdu",
+      "filename": "dataset.zip",
+      "destination": "veri/external_archives/eflatun_teknofest_2022_dataset.zip",
+      "expected_size_gb": 46,
+      "url": "https://drive.google.com/file/d/1NdMg_4DKWNWg6_lzqMm6tzfqBjaK8Hdu/view?usp=sharing",
+      "license": "unspecified-github-readme-citation",
+      "modality": "rgb",
+      "notes": "Vehicle/Pedestrian aerial YOLO archive. Do not download onto the current 33 GB free disk; use an external disk or free at least 55-60 GB."
+    },
+    {
+      "name": "roboflow_hepsi_aaa",
+      "kind": "roboflow",
+      "workspace": "aaa-mxlgr",
+      "project": "hepsi-xvzg8",
+      "version": 1,
+      "format": "yolov8",
+      "destination": "veri/external/roboflow_hepsi_aaa",
+      "url": "https://universe.roboflow.com/aaa-mxlgr/hepsi-xvzg8",
+      "license": "CC BY 4.0",
+      "modality": "rgb",
+      "notes": "Public Roboflow Universe project with insan/tasit/uai/uap classes; requires ROBOFLOW_API_KEY for export download."
+    },
+    {
+      "name": "roboflow_teknofest_2023_uap_uai",
+      "kind": "roboflow",
+      "workspace": "teknofest-2023",
+      "project": "uap-uai-alanlari-veri-seti",
+      "version": 1,
+      "format": "yolov8",
+      "destination": "veri/external/roboflow_teknofest_2023_uap_uai",
+      "url": "https://universe.roboflow.com/teknofest-2023/uap-uai-alanlari-veri-seti",
+      "license": "CC BY 4.0",
+      "modality": "rgb",
+      "notes": "Public Roboflow Universe UAP/UAI project; class variants such as UAİ-, UAP- are merged to uai/uap."
+    },
+    {
+      "name": "roboflow_dronecekimi_ders",
+      "kind": "roboflow",
+      "workspace": "ders-mqfbo",
+      "project": "dronecekimi",
+      "version": 1,
+      "format": "yolov8",
+      "destination": "veri/external/roboflow_dronecekimi_ders",
+      "url": "https://universe.roboflow.com/ders-mqfbo/dronecekimi",
+      "license": "CC BY 4.0",
+      "modality": "rgb",
+      "notes": "Small public Roboflow Universe project with insan/tasit/uai/uap classes; export may require creating a version first."
+    },
+    {
+      "name": "hf_uap_uai_yolo12x_best",
+      "kind": "huggingface_file",
+      "repo_id": "momererkoc/uap-uai-object-detection-yolo12x",
+      "filename": "best.pt",
+      "destination": "artifacts/pretrained/uap_uai_yolo12x_best.pt",
+      "url": "https://huggingface.co/momererkoc/uap-uai-object-detection-yolo12x",
+      "license": "MIT",
+      "modality": "rgb",
+      "notes": "Two-class UAP/UAI checkpoint for auto-labeling or comparison, not a final four-class detector."
+    }
+  ]
+}

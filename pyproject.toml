@@ -12,6 +12,7 @@ dependencies = [
   "fastapi>=0.115,<1",
   "httpx>=0.27,<1",
   "pillow>=10,<13",
+  "psutil>=6,<8",
   "pydantic>=2.8,<3",
   "python-dotenv>=1,<2",
   "uvicorn[standard]>=0.30,<1",
@@ -29,7 +30,27 @@ ai = [
   "opencv-python-headless>=4.10,<5",
 ]
 export = [
+  "onnx>=1.20,<2",
+  "onnxslim>=0.1.82,<1",
   "ultralytics>=8.3,<9",
+]
+data = [
+  "PyYAML>=6,<7",
+  "roboflow>=1.2,<2",
+]
+odometry-data = [
+  "PyYAML>=6,<7",
+  "rosbags>=0.11,<0.12",
+]
+matching-eval = [
+  "einops>=0.3,<1",
+  "gdown>=5,<6",
+  "kornia>=0.4.1,<0.5",
+  "loguru>=0.5.3,<1",
+  "numpy>=2,<3",
+  "opencv-python-headless>=4.10,<5",
+  "torch>=2,<3",
+  "yacs>=0.1.8,<1",
 ]
 
 [tool.ruff]
@@ -44,6 +65,8 @@ hurgor-client = "hurgor.client:main"
 hurgor-export-yolo = "hurgor.export_models:main"
 hurgor-mock-server = "hurgor.mock_server:main"
 hurgor-official-probe = "hurgor.official_probe:main"
+hurgor-preflight = "hurgor.preflight:main"
+hurgor-metrics = "hurgor.metrics:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hurgor"]

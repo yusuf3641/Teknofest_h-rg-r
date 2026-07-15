@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "model_file": "best.onnx",
+  "sha256": "484a766c10fe67c6177dc8ab3379c21ea4d9558a1eb95060b814402f05c1d31f",
+  "classes": [
+    "arac",
+    "insan",
+    "uap",
+    "uai"
+  ],
+  "output_format": "yolo_end2end",
+  "image_size": 640,
+  "batch": 1,
+  "target": "onnx",
+  "half": false,
+  "int8": false,
+  "dynamic": true
+}

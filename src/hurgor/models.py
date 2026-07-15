@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import math
 import re
+from collections.abc import Mapping
 from typing import Any, Literal
 from urllib.parse import urlsplit
 
@@ -38,12 +39,22 @@ class FrameMetadata(BaseModel):
     image_url: str
     video_name: str
     session: str
+    modality: Literal["rgb", "thermal", "unknown"] = "unknown"
     translation_x: float
     translation_y: float
     translation_z: float
     gps_health_status: Literal[0, 1] = Field(
         validation_alias=AliasChoices("gps_health_status", "health_status")
     )
+    # The general 2026 specification says that per-frame orientation accompanies
+    # the sample positioning video, while the technical API table does not assign
+    # these values a mandatory field.  Keep quaternion telemetry optional so an
+    # undocumented/extended server response can improve heading without making it
+    # a protocol dependency.
+    orientation_x: float | None = None
+    orientation_y: float | None = None
+    orientation_z: float | None = None
+    orientation_w: float | None = None
 
     @field_validator("gps_health_status", mode="before")
     @classmethod
@@ -61,12 +72,42 @@ class FrameMetadata(BaseModel):
             return values
         return None
 
+    @property
+    def orientation_quaternion(self) -> tuple[float, float, float, float] | None:
+        values = (
+            self.orientation_x,
+            self.orientation_y,
+            self.orientation_z,
+            self.orientation_w,
+        )
+        if any(value is None for value in values):
+            return None
+        quaternion = tuple(float(value) for value in values if value is not None)
+        if len(quaternion) != 4 or not all(math.isfinite(value) for value in quaternion):
+            return None
+        norm = math.sqrt(sum(value * value for value in quaternion))
+        if norm <= 1e-9:
+            return None
+        return tuple(value / norm for value in quaternion)
+
+    @property
+    def orientation_heading_rad(self) -> float | None:
+        quaternion = self.orientation_quaternion
+        if quaternion is None:
+            return None
+        x, y, z, w = quaternion
+        heading = math.atan2(
+            2.0 * (w * z + x * y),
+            1.0 - 2.0 * (y * y + z * z),
+        )
+        return heading if math.isfinite(heading) else None
+
 
 class BoundingBox(BaseModel):
-    top_left_x: float = Field(ge=0)
-    top_left_y: float = Field(ge=0)
-    bottom_right_x: float = Field(ge=0)
-    bottom_right_y: float = Field(ge=0)
+    top_left_x: float = Field(ge=0, allow_inf_nan=False)
+    top_left_y: float = Field(ge=0, allow_inf_nan=False)
+    bottom_right_x: float = Field(ge=0, allow_inf_nan=False)
+    bottom_right_y: float = Field(ge=0, allow_inf_nan=False)
 
     @model_validator(mode="after")
     def validate_order(self) -> BoundingBox:
@@ -131,6 +172,25 @@ class DetectedUndefinedObject(BoundingBox):
     object_id: int = Field(strict=True, ge=0)
 
 
+class ReferenceDefinition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    url: str
+    session: str
+    image_url: str
+    frame_start: str
+    frame_end: str
+    frame_start_image_url: str | None = None
+    frame_end_image_url: str | None = None
+    order: int = Field(ge=0)
+
+    def is_active(self, frame_url: str) -> bool:
+        current = _trailing_identifier(frame_url)
+        start = _trailing_identifier(self.frame_start)
+        end = _trailing_identifier(self.frame_end)
+        return start <= current <= end
+
+
 class Prediction(BaseModel):
     id: int = Field(strict=True, ge=0, le=MAX_SAFE_JSON_INTEGER)
     user: str
@@ -142,7 +202,11 @@ class Prediction(BaseModel):
     def canonical_dict(self) -> dict[str, Any]:
         return self.model_dump(mode="json")
 
-    def official_dict(self, base_url: str) -> dict[str, Any]:
+    def official_dict(
+        self,
+        base_url: str,
+        reference_urls: Mapping[int, str] | None = None,
+    ) -> dict[str, Any]:
         return {
             "frame": self.frame,
             "detected_objects": [
@@ -165,7 +229,20 @@ class Prediction(BaseModel):
                 }
                 for item in self.detected_translations
             ],
-            "reference_predictions": [],
+            "reference_predictions": [
+                {
+                    "reference": _official_reference_url(
+                        item.object_id,
+                        base_url,
+                        reference_urls,
+                    ),
+                    "top_left_x": str(item.top_left_x),
+                    "top_left_y": str(item.top_left_y),
+                    "bottom_right_x": str(item.bottom_right_x),
+                    "bottom_right_y": str(item.bottom_right_y),
+                }
+                for item in self.detected_undefined_objects
+            ],
         }
 
 
@@ -184,3 +261,30 @@ def _official_class_url(cls_url: str, base_url: str) -> str:
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ValueError("base_url must be an absolute HTTP(S) URL")
     return f"{parsed.scheme}://{parsed.netloc}/classes/{normalized_id}/"
+
+
+def _official_reference_url(
+    object_id: int,
+    base_url: str,
+    reference_urls: Mapping[int, str] | None,
+) -> str:
+    if reference_urls and object_id in reference_urls:
+        value = reference_urls[object_id]
+    else:
+        parsed_base = urlsplit(base_url)
+        if parsed_base.scheme not in {"http", "https"} or not parsed_base.netloc:
+            raise ValueError("base_url must be an absolute HTTP(S) URL")
+        value = f"{parsed_base.scheme}://{parsed_base.netloc}/reference/{object_id}/"
+    parsed = urlsplit(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError(f"invalid reference URL: {value}")
+    if not re.fullmatch(r"/reference/\d+/", parsed.path):
+        raise ValueError(f"reference URL must end with /reference/<id>/: {value}")
+    return value
+
+
+def _trailing_identifier(value: str) -> int:
+    match = re.search(r"(?P<identifier>\d+)/?$", value)
+    if match is None:
+        raise ValueError(f"URL does not end with a numeric identifier: {value}")
+    return int(match.group("identifier"))

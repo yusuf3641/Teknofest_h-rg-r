@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "model_file": "best.onnx",
+  "sha256": "3da1ec99eb9e9269340ef50233aadf9cbdfee8237f9e7f3b2f4dcfe1341ddd56",
+  "classes": [
+    "arac",
+    "insan"
+  ],
+  "output_format": "yolo_end2end",
+  "image_size": 640,
+  "batch": 1,
+  "source_checkpoint": "hurgor-yolo26n-thermal-specialist-v1-20260715-0704/weights/best.pt"
+}

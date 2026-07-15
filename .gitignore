@@ -10,10 +10,16 @@ htmlcov/
 system.log*
 .trt_cache/
 logs/
+artifacts/
+diagnostics/
+tmp/
+wheelhouse/
 
 # Yerel yarışma verileri ve büyük medya/arşiv dosyaları repoya eklenmemeli.
 veri/
 Rapor/
+Hurgor-YapayZeka-Gorev1/
+/best.pt
 *.mp4
 *.MP4
 *.mov

@@ -94,7 +94,9 @@ async def probe(settings: ClientSettings, *, fetch_frame: bool = False) -> int:
     ) as client:
         saw_401 = False
         auth_headers: list[str] = []
-        for path in (settings.progress_endpoint, settings.frame_endpoint):
+        # A frame GET changes competition state by reserving the current frame. Keep the
+        # default probe strictly read-only; --fetch-frame uses CompetitionAPI explicitly.
+        for path in _read_only_probe_paths(settings):
             result = await _get(client, path)
             LOGGER.info(
                 "probe_get path=%s status=%s www_authenticate=%s allow=%s body=%s",
@@ -143,6 +145,10 @@ async def probe(settings: ClientSettings, *, fetch_frame: bool = False) -> int:
 
     LOGGER.info("probe_complete")
     return 0
+
+
+def _read_only_probe_paths(settings: ClientSettings) -> tuple[str, ...]:
+    return (settings.progress_endpoint,)
 
 
 def main() -> None:

@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "runtime_model_sha256": "484a766c10fe67c6177dc8ab3379c21ea4d9558a1eb95060b814402f05c1d31f",
+  "calibration_checkpoint_sha256": "0fa4c4aaf5aa25a626627ebda04f21348c61c18eb19155492469f245566828e9",
+  "classes": [
+    "arac",
+    "insan",
+    "uap",
+    "uai"
+  ],
+  "thresholds": {
+    "arac": 0.25,
+    "insan": 0.158,
+    "uap": 0.25,
+    "uai": 0.25
+  },
+  "calibration": {
+    "dataset": "artifacts/datasets/hurgor_detector_grouped/data.yaml",
+    "split": "val",
+    "images": 1195,
+    "instances_all_classes": 9832,
+    "image_size": 640,
+    "class_name": "insan",
+    "class_id": 1,
+    "objective": "f_beta_1",
+    "selected": {
+      "threshold": 0.15815815815815815,
+      "precision": 0.580658795951819,
+      "recall": 0.3468667255075022,
+      "f_beta": 0.4342979476662728,
+      "beta": 1.0
+    },
+    "runtime_threshold": 0.158,
+    "baseline": {
+      "threshold": 0.2502502502502503,
+      "precision": 0.6908563279603849,
+      "recall": 0.3067099499516752,
+      "f_beta": 0.42481891071142847,
+      "beta": 1.0
+    },
+    "runtime_output_probe": {
+      "images": 50,
+      "raw_rows": 15000,
+      "rows_at_or_above_runtime_threshold": 701,
+      "rows_at_or_above_baseline_threshold": 638,
+      "supports_runtime_threshold": true
+    }
+  }
+}

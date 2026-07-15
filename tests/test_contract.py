@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import json
+
 import httpx
 import pytest
 from pydantic import ValidationError
 
-from hurgor.config import MockSettings
-from hurgor.mock_server import create_app
+from hurgor.client import CompetitionAPI
+from hurgor.config import ClientSettings, MockSettings
+from hurgor.mock_server import MockState, create_app
 from hurgor.models import (
     MAX_SAFE_JSON_INTEGER,
     DetectedObject,
@@ -42,7 +45,7 @@ async def test_page_25_get_contract_is_a_list_with_health_status() -> None:
             "session": "http://testserver/session/2/",
             "translation_x": 0.0,
             "translation_y": 0.0,
-            "translation_z": 10.0,
+            "translation_z": 0.0,
             "health_status": 1,
         }
     ]
@@ -170,11 +173,33 @@ def test_prediction_id_is_strict_deterministic_and_json_safe() -> None:
         )
 
 
+def test_mock_scores_posted_outage_position_against_hidden_truth() -> None:
+    class PositionSource:
+        frame_count = 3
+
+        def render(self, index: int) -> bytes:
+            del index
+            return b""
+
+        def translation(self, index: int) -> tuple[float, float, float]:
+            return ((0.0, 0.0, 0.0), (2.0, 0.0, 0.0), (4.0, 0.0, 0.0))[index]
+
+    settings = MockSettings(frame_count=3, healthy_frames=1)
+    state = MockState(settings=settings, frame_source=PositionSource())
+    state.record_position(0, (0.0, 0.0, 0.0))
+    state.record_position(1, (1.0, 0.0, 0.0))
+    state.record_position(2, (2.0, 0.0, 0.0))
+
+    summary = state.position_summary()
+    assert summary["first_error_m"] == 0.0
+    assert summary["outage"]["count"] == 2
+    assert summary["outage"]["mae_m"] == pytest.approx(1.5)
+    assert summary["outage_hold_baseline"]["mae_m"] == pytest.approx(3.0)
+    assert summary["outage_improvement_percent"] == pytest.approx(50.0)
+
+
 def test_class_url_is_derived_from_server_base_url() -> None:
-    assert (
-        class_url_from_id("http://127.0.0.25:5000/api", 3)
-        == "http://127.0.0.25:5000/classes/3/"
-    )
+    assert class_url_from_id("http://127.0.0.25:5000/api", 3) == "http://127.0.0.25:5000/classes/3/"
     with pytest.raises(ValidationError):
         DetectedObject(
             cls="3",
@@ -220,7 +245,10 @@ def test_official_payload_matches_connection_interface_shape() -> None:
         ],
     )
 
-    payload = prediction.official_dict("http://official.test:1025")
+    payload = prediction.official_dict(
+        "http://official.test:1025",
+        {1: "http://official.test/reference/1/"},
+    )
 
     assert payload == {
         "frame": "http://official.test/frames/4/",
@@ -242,8 +270,63 @@ def test_official_payload_matches_connection_interface_shape() -> None:
                 "translation_z": "0.03",
             }
         ],
-        "reference_predictions": [],
+        "reference_predictions": [
+            {
+                "reference": "http://official.test/reference/1/",
+                "top_left_x": "1.0",
+                "top_left_y": "2.0",
+                "bottom_right_x": "3.0",
+                "bottom_right_y": "4.0",
+            }
+        ],
     }
     assert "id" not in payload
     assert "user" not in payload
     assert "detected_undefined_objects" not in payload
+
+
+@pytest.mark.asyncio
+async def test_official_client_uses_reference_url_from_download_manifest(tmp_path) -> None:
+    cache = tmp_path / "references"
+    cache.mkdir()
+    cache.joinpath("references_manifest.json").write_text(
+        '[{"object_id": 1, "source_url": "http://official.test/reference/9/"}]',
+        encoding="utf-8",
+    )
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(request=request, payload=request.content)
+        return httpx.Response(200, json={"accepted": True}, request=request)
+
+    prediction = Prediction(
+        id=1,
+        user="http://official.test/users/1/",
+        frame="http://official.test/frames/1/",
+        detected_translations=[
+            DetectedTranslation(translation_x=0, translation_y=0, translation_z=1)
+        ],
+        detected_undefined_objects=[
+            DetectedUndefinedObject(
+                object_id=1,
+                top_left_x=1,
+                top_left_y=2,
+                bottom_right_x=3,
+                bottom_right_y=4,
+            )
+        ],
+    )
+    settings = ClientSettings(
+        base_url="http://official.test:1025",
+        api_contract="official",
+        reference_cache_dir=str(cache),
+        max_retries=0,
+    )
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(handler),
+        base_url=settings.base_url,
+    ) as client:
+        await CompetitionAPI(settings, client).submit(prediction)
+
+    payload = json.loads(captured["payload"])
+    assert payload["reference_predictions"][0]["reference"] == ("http://official.test/reference/9/")

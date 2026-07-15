@@ -5,22 +5,31 @@ services:
     command: ["--host", "0.0.0.0", "--port", "5000"]
     ports:
       - "5000:5000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/status', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     environment:
       HURGOR_MOCK_FRAME_COUNT: "2250"
     volumes:
-      - ./data:/data:ro
+      - ./veri:/veri:ro
 
   edge-client:
     build: .
     depends_on:
-      - mock-server
+      mock-server:
+        condition: service_healthy
     command: ["--base-url", "http://mock-server:5000"]
     environment:
       HURGOR_LOG_FILE: /logs/system.log
-      HURGOR_YOLO_ONNX_PATH: /models/yolo.onnx
+      HURGOR_METRICS_FILE: /logs/metrics.jsonl
+      HURGOR_YOLO_ONNX_PATH: /models/best.onnx
+      HURGOR_MODEL_MANIFEST_PATH: /models/best.json
+      HURGOR_MODEL_SHA256: ${HURGOR_MODEL_SHA256:-484a766c10fe67c6177dc8ab3379c21ea4d9558a1eb95060b814402f05c1d31f}
+      HURGOR_DETECTOR_THRESHOLDS_PATH: /models/detector_thresholds.json
       HURGOR_REFERENCE_IMAGES_DIR: /references
     volumes:
-      - ./models:/models:ro
-      - ./references:/references:ro
+      - ./colab_result:/models:ro
+      - ./artifacts/references:/references:ro
       - ./logs:/logs
-
